@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.eurowings.subscriber.model.Response;
 import com.eurowings.subscriber.model.User;
 import com.eurowings.subscriber.repository.UserRepository;
 
@@ -36,20 +36,44 @@ public class UserController {
 	 * 
 	 */
 	@GetMapping("/reciveNewletter/{email}")
-	public ResponseEntity<String> isNewletterSubscribed(@PathVariable String email) {
+	public Response isNewsletterSubscribed(@PathVariable String email) {
 
+		Response response = new Response();
+		HttpStatus code;
+		String message;
+		List<User> userList = null;
 		User user = null;
 		// System.out.println(email);
-		if (email.length() != 0 && email != null) {
-			user = userRepository.findById(email).get();
-			System.out.println("User : " + user.getEmailId());
-			if (user != null)
-				return new ResponseEntity(user.isNewsletterSubcribed() + "", HttpStatus.OK);
-			else
-				return new ResponseEntity("No such user.", HttpStatus.NO_CONTENT);
-		} else
-			return new ResponseEntity("", HttpStatus.BAD_REQUEST);
+		try {
+			if (email.length() != 0 && email != null) {
+				user = userRepository.findById(email).get();
+				System.out.println("User : " + user.getEmailId());
+				if (user != null) {
+					userList = new ArrayList<User>();
+					if (user.isNewsletterSubcribed() == true)
+						message = user.getEmailId() + " is subscribed to the newletter.";
+					else
+						message = user.getEmailId() + " is not subscribed to the newletter.";
+					code = HttpStatus.OK;
+					userList.add(user);
+				} else {
+					code = HttpStatus.NO_CONTENT;
+					message = "No such user";
+				}
+			} else {
+				code = HttpStatus.BAD_REQUEST;
+				message = "Illegal Arguments.";
+				// return new ResponseEntity("", HttpStatus.BAD_REQUEST);
+			}
+		} catch (NoSuchElementException e) {
+			code = HttpStatus.NO_CONTENT;
+			message = email + " does not exist.";
 
+		}
+		response.setCode(code);
+		response.setMessage(message);
+		response.setUserList(userList);
+		return response;
 	}
 
 	/*
@@ -59,17 +83,32 @@ public class UserController {
 	 */
 
 	@PostMapping("/subscribe")
-	public ResponseEntity<String> subscribeUser(@RequestBody User user) {
-		User u=null;
+	public Response subscribeUser(@RequestBody User user) {
+		Response response = new Response();
+		HttpStatus code;
+		String message;
+		List<User> userList = null;
+		User u = null;
 		if (!userRepository.findById(user.getEmailId()).isPresent()) {
 			System.out.println(user.toString());
 			u = userRepository.save(user);
-			if (u != null)
-				return new ResponseEntity("User with "+u.getEmailId()+"Subscribed Successfully.", HttpStatus.CREATED);
-			else
-				return new ResponseEntity("Subscription failed for user with "+u.getEmailId()+" Please try again.", HttpStatus.INTERNAL_SERVER_ERROR);
-		} else
-			return new ResponseEntity("User with email "+u.getEmailId()+".", HttpStatus.NOT_FOUND);
+			if (u != null) {
+				userList = new ArrayList<User>();
+				code = HttpStatus.CREATED;
+				message = "User with email id " + u.getEmailId() + "subscribed successfully.";
+				userList.add(u);
+			} else {
+				code = HttpStatus.INTERNAL_SERVER_ERROR;
+				message = "Subscription failed for user with " + u.getEmailId() + " Please try again.";
+			}
+		} else {
+			code = HttpStatus.FOUND;
+			message = "User with email " + user.getEmailId() + " is already exist.";
+		}
+		response.setCode(code);
+		response.setMessage(message);
+		response.setUserList(userList);
+		return response;
 	}
 
 	@GetMapping("/getAllUsers")
@@ -85,18 +124,35 @@ public class UserController {
 	 * 
 	 */
 	@DeleteMapping("/unsubscribe/{email}")
-	public ResponseEntity<String> unsubscribe(@PathVariable String email) {
-		if (!userRepository.findById(email).isPresent()) {
-			if (email.length() != 0 && email != "") {
-				userRepository.deleteById(email);
-				return new ResponseEntity("User with email "+ email +" unsubscribed successfully.", HttpStatus.OK);
-			} else
-				return new ResponseEntity("Unable to unsubscribe user now. Please try again.",
-						HttpStatus.INTERNAL_SERVER_ERROR);
-			
-
-		} else
-			return new ResponseEntity("User with email "+email+" does not exist.", HttpStatus.NOT_FOUND);
+	public Response unsubscribe(@PathVariable String email) {
+		Response response = new Response();
+		HttpStatus code = null;
+		String message = null;
+		List<User> userList = null;
+		try {
+			if (userRepository.findById(email).isPresent()) {
+				if (email.length() != 0 && email != "") {
+					userRepository.deleteById(email);
+					if (!userRepository.findById(email).isPresent()) {
+						code = HttpStatus.OK;
+						message = "User with email " + email + " unsubscribed successfully.";
+					}
+				} else {
+					code = HttpStatus.OK;
+					message = "Illegal email.";
+				}
+			} else {
+				code = HttpStatus.NOT_FOUND;
+				message = "User with email " + email + " does not exist.";
+			}
+		} catch (IllegalArgumentException e) {
+			code = HttpStatus.NOT_FOUND;
+			message = "User with email " + email + " does not exist.";
+		}
+		response.setCode(code);
+		response.setMessage(message);
+		response.setUserList(userList);
+		return response;
 	}
 	/*
 	 * 
@@ -105,90 +161,119 @@ public class UserController {
 	 * 
 	 */
 
-	@PatchMapping("/subscribeNewsletter/{email}")
-	public ResponseEntity<String> subscribeNewsletter(@PathVariable String email) {
+	@PatchMapping("/subscribeToNewsletter/{email}")
+	public Response subscribeNewsletter(@PathVariable String email) {
+		Response response = new Response();
+		HttpStatus code = null;
+		String message = null;
+		List<User> userList = null;
 		try {
 			User user;
 			boolean newletterSubscription;
 			if (email != null && email != "") {
 				user = userRepository.findById(email).get();
 				if (user != null) {
+					userList = new ArrayList<User>();
 					newletterSubscription = user.isNewsletterSubcribed();
 					if (newletterSubscription == false) {
 						user.setNewsletterSubcribed(true);
 						userRepository.save(user);
-						return new ResponseEntity("User with email "+email+" successfully subscribed to newsletter.", HttpStatus.OK);
-					} else {
-						return new ResponseEntity("User is already subscribed to newsletter.", HttpStatus.METHOD_NOT_ALLOWED);
-					}
+						code = HttpStatus.OK;
+						message = "User with email " + email + " successfully subscribed to newsletter.";
 
-				} else
-					return new ResponseEntity("User with email "+email+" does not exist.", HttpStatus.NOT_FOUND);
+					} else {
+						code = HttpStatus.METHOD_NOT_ALLOWED;
+						message = "User with email " + email + " is already subscribed to newsletter.";
+					}
+					userList.add(user);
+
+				} else {
+					code=HttpStatus.NOT_FOUND;
+					message="User with email " + email + " does not exist.";
+				}
 			} else {
-				return new ResponseEntity("Improper Email.", HttpStatus.BAD_REQUEST);
+				code=HttpStatus.BAD_REQUEST;
+				message="Improper Email.";
 			}
 		} // try
 		catch (NoSuchElementException e) {
-			return new ResponseEntity("User with email does not exist.", HttpStatus.BAD_REQUEST);
+			code = HttpStatus.BAD_REQUEST;
+			message = "User with email does not exist.";
+
+		} catch (IllegalArgumentException e) {
+			code = HttpStatus.BAD_REQUEST;
+			message = "Illegal argument ";
+
 		}
-		catch(IllegalArgumentException e)
-		{
-			return new ResponseEntity("Illegal argument "+email+".", HttpStatus.BAD_REQUEST);
-		}
-		
+		response.setCode(code);
+		response.setMessage(message);
+		response.setUserList(userList);
+		return response;
+
 	}
 
 	@GetMapping("/getUserBefore/{date}")
-	public ResponseEntity<List<User>> usersBefore(@PathVariable String date) {
+	public Response usersBefore(@PathVariable String date) {
+		
+		Response response = new Response();
+		HttpStatus code = null;
+		String message = null;
+		
 		SimpleDateFormat sdfrmt = new SimpleDateFormat("yyyy-MM-dd");
 		List<User> userList = new ArrayList<User>();
-		List<User> result = null;
+		
+
 		try {
 			Date beforeDate = sdfrmt.parse(date);
 			if (beforeDate != null) {
-				userList = userRepository.findAll();
-				if (!userList.isEmpty()) {
-					result=new ArrayList<User>();
-					for (User user : userList) {
-						Date objDate = user.getSubscriptionDate();
-						if (objDate.before(beforeDate)) {
-							result.add(user);
-						}
-					}
-					return ResponseEntity.accepted().body(result);
+				userList=userRepository.findBySubscriptionDateBefore(beforeDate);
+				if(!userList.isEmpty()) {
+					code=HttpStatus.OK;
+					message=userList.size() + " users found.";
 				}
 			}
 		} catch (ParseException e) {
-			return new ResponseEntity("Enter the date in yyyy-MM-dd format.",HttpStatus.BAD_GATEWAY);
+			code=HttpStatus.BAD_REQUEST;
+			message="Enter the date in yyyy-MM-dd format.";
 		}
 		
-		
-		return (result==null)?new ResponseEntity("User before "+date+" does not exist.",HttpStatus.NOT_FOUND): ResponseEntity.accepted().body(result);
+		response.setCode(code);
+		response.setMessage(message);
+		response.setUserList(userList);
+		return response;
 	}
 
 	@GetMapping("/getUserAfter/{date}")
-	public ResponseEntity<List<User>> usersAfter(@PathVariable String date) {
+	public Response usersAfter(@PathVariable String date) {
+
+		Response response = new Response();
+		HttpStatus code = null;
+		String message = null;
+		
 		SimpleDateFormat sdfrmt = new SimpleDateFormat("yyyy-MM-dd");
 		List<User> userList = new ArrayList<User>();
-		List<User> result = new ArrayList<User>();
+
 		try {
-			Date beforeDate = sdfrmt.parse(date);
-			if (beforeDate != null) {
-				userList = userRepository.findAll();
+			System.out.println("after");
+			Date afterDate = sdfrmt.parse(date);
+			System.out.println(" Date: "+afterDate);
+			if (afterDate != null) {
+				userList = userRepository.findBySubscriptionDateAfter(afterDate);
 				if (!userList.isEmpty()) {
-					for (User user : userList) {
-						Date objDate = user.getSubscriptionDate();
-						if (objDate.after(beforeDate)) {
-							result.add(user);
-						}
-					}
-					return ResponseEntity.accepted().body(result);
+					code=HttpStatus.OK;
+					message=userList.size() + " users found.";
 				}
 			}
 		} catch (ParseException e) {
-			return new ResponseEntity<>(HttpStatus.BAD_GATEWAY);
+			code=HttpStatus.BAD_REQUEST;
+			message="Enter the date in yyyy-MM-dd format.";
 		}
-		return (result==null)?new ResponseEntity("User after "+date+" does not exist.",HttpStatus.NOT_FOUND): ResponseEntity.accepted().body(result);
+		
+		
+		response.setCode(code);
+		response.setMessage(message);
+		response.setUserList(userList);
+		return response;
 	}
 
 }
