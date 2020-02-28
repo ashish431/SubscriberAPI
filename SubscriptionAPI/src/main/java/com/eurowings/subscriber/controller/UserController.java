@@ -69,7 +69,7 @@ public class UserController {
 
 	/*
 	 * 
-	 * registration of the user. can be opt to receive newsletter
+	 * registration of the user. can opt to receive newsletter
 	 * 
 	 */
 
@@ -112,20 +112,27 @@ public class UserController {
 	 * Un-subscribing is equivalent to removing your account from the platform.
 	 * 
 	 */
-	@PatchMapping("/unsubscribe/{email}")
+	@PatchMapping("/unsubscribeNewsletter/{email}")
 	public Response unsubscribe(@PathVariable String email) {
 		Response response = new Response();
 		List<User> userList = null;
 		User user = null;
+		boolean newletterSubscription;
 		try {
 			if (email.length() != 0 && email != "") {
 				user = userRepository.findById(email).get();
 				if (user != null) {
-					user.setNewsletterSubcribed(false);
-					userRepository.save(user);
-					response.setCode(HttpStatus.OK);
-					response.setMessage("User with email "+email+"successfully unsubscribed.");
-
+					newletterSubscription = user.isNewsletterSubcribed();
+					if (newletterSubscription == true) {
+						user.setNewsletterSubcribed(false);
+						userRepository.save(user);
+						response.setCode(HttpStatus.OK);
+						response.setMessage("User with email " + email + "successfully unsubscribed.");
+					}
+					else{
+						response.setCode(HttpStatus.OK);
+						response.setMessage("User with email " + email + "is already unsubscribed.");
+					}
 				} else {
 					response.setCode(HttpStatus.NOT_FOUND);
 					response.setMessage("User with email " + email + " does not exist.");
@@ -151,23 +158,24 @@ public class UserController {
 		User user;
 		boolean newletterSubscription;
 		try {
-			
+			System.out.println("eamil :"+ email);
 			if (email != null && email != "") {
 				user = userRepository.findById(email).get();
+				System.out.println(user.toString());
 				if (user != null) {
-					userList = new ArrayList<User>();
+					userList=new ArrayList<User>();
 					newletterSubscription = user.isNewsletterSubcribed();
 					if (newletterSubscription == false) {
 						user.setNewsletterSubcribed(true);
 						userRepository.save(user);
 						response.setCode(HttpStatus.OK);
 						response.setMessage("User with email " + email + " successfully subscribed to newsletter.");
-
+						userList.add(user);
 					} else {
 						response.setCode(HttpStatus.FOUND);
 						response.setMessage("User with email " + email + " is already subscribed to newsletter.");
 					}
-					userList.add(user);
+					
 					response.setUserList(userList);
 
 				} else {
@@ -206,9 +214,12 @@ public class UserController {
 			if (!userList.isEmpty()) {
 				response.setCode(HttpStatus.OK);
 				response.setMessage(userList.size() + " users found.");
-				response.setUserList(userList);
-				
+
+			} else {
+				response.setCode(HttpStatus.NOT_FOUND);
+				response.setMessage("No users found.");
 			}
+			response.setUserList(userList);
 
 		} catch (ParseException e) {
 			response.setCode(HttpStatus.BAD_REQUEST);
@@ -234,7 +245,7 @@ public class UserController {
 				response.setMessage(userList.size() + " users found.");
 				response.setUserList(userList);
 			} else {
-				response.setCode(HttpStatus.OK);
+				response.setCode(HttpStatus.NOT_FOUND);
 				response.setMessage("No users found.");
 			}
 		} catch (ParseException e) {
