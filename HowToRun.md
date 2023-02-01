@@ -9,3 +9,4 @@ Follow the below mentioned steps to run the service:
       
         mvn spring-boot:run
 5. Information about the end points is given in readme.md file.
+6. Run the code Valtech
